@@ -1,0 +1,62 @@
+# config/devops/locust.yml
+
+# --- Configuración del Test ---
+loadtest:
+  # El host al que apuntará la prueba de carga
+  locust_host: "https://www.icesi.edu.co/moodle/my/"
+
+  # Nombres de los ConfigMaps que creamos con nuestro chart local
+  locust_locustfile_configmap: "custom-locust-scripts"
+  locust_lib_configmap: "custom-locust-libs"
+
+# --- Configuración de los Workers y Autoescalado con KEDA ---
+worker:
+  # Réplicas iniciales. KEDA las ajustará.
+  replicas: 1
+
+  # Límites de recursos para cada pod worker.
+  # ¡Ajusta esto según la intensidad de tu prueba!
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+  # Habilitar KEDA
+  keda:
+    enabled: true
+    minReplicas: 1 # Siempre mantener 1 worker, incluso sin prueba activa
+    maxReplicas: 20 # Límite máximo de workers para no saturar el clúster
+    triggers: |
+      - type: metrics-api
+        metadata:
+          activationTargetValue: "0" # Keda se activa si hay mas de 0 usuarios
+          targetValue: "100"   # Escalar para que cada worker maneje 100 usuarios
+          url: "http://{{ template "locust.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ $.Values.service.port }}/stats/requests"
+          format: json
+          valueLocation: 'user_count'
+
+# --- Configuración del Master ---
+master:
+  args:
+    - "--master"
+    - "--master-bind-host=0.0.0.0"
+    - "--autostart"
+    - "--users=150"
+    - "--spawn-rate=50"
+    - "--run-time=1m"
+    # - "--autoquit=0"
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1024Mi
+    limits:
+      cpu: 2000m
+      memory: 2048Mi
+
+# --- Exponer la UI de Locust ---
+# Para acceder desde fuera, puedes cambiarlo a LoadBalancer o crear un Ingress
+service:
+  type: NodePort

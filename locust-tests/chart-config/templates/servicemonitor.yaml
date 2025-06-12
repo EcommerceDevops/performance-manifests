@@ -1,0 +1,31 @@
+{{- /*
+  Este archivo crea el objeto ServiceMonitor.
+  Solo se creará si en tus valores pones 'exporter.enabled: true'.
+*/}}
+{{- if .Values.exporter.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  # Un nombre descriptivo para nuestro ServiceMonitor
+  name: {{ .Values.exporter.name }}-servicemonitor
+  # Debe estar en el mismo namespace que el Service del exporter y que la release de locust-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    # Esta es la etiqueta que el Prometheus instalado por kube-prometheus-stack
+    # busca por defecto para saber a quién monitorear.
+    # Es una buena práctica mantenerla aunque tu configuración actual sea permisiva.
+    release: prom
+spec:
+  # El selector le dice a este ServiceMonitor qué Service debe vigilar.
+  selector:
+    matchLabels:
+      # Busca el Service que tenga la etiqueta 'app' con el valor del nombre de nuestro exporter.
+      # Esto coincide exactamente con la etiqueta que le pusimos al Service en 'exporter.yaml'.
+      app: {{ .Values.exporter.name }}
+
+  # El endpoint describe cómo Prometheus debe recolectar (scrapear) las métricas del Service encontrado.
+  endpoints:
+    - port: metrics # Apunta al puerto llamado 'metrics' en el Service (que es el 9647).
+      path: /metrics # La ruta donde el exportador expone las métricas.
+      interval: 15s # La frecuencia con la que Prometheus recolectará los datos.
+{{- end }}

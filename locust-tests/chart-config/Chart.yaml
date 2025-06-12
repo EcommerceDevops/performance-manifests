@@ -1,0 +1,5 @@
+apiVersion: v2
+name: locust-config
+description: A chart to create configmaps for locust tests
+type: application
+version: 0.1.0

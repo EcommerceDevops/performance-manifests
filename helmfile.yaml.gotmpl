@@ -1,0 +1,48 @@
+repositories:
+  - name: deliveryhero
+    url: https://raw.githubusercontent.com/deliveryhero/helm-charts/refs/heads/master/
+
+environments:
+  endurance:
+    values:
+      - "./config/endurance/locust.yml"
+  load:
+    values:
+      - "./config/load/locust.yml"
+  spike:
+    values:
+      - "./config/spike/locust.yml"
+  stress:
+    values:
+      - "./config/stress/locust.yml"
+  dev:
+    values:
+      - "./config/dev/locust.yml"
+---
+releases:
+  - name: locust-config
+    namespace: testing
+    createNamespace: true
+    chart: ./locust-tests/chart-config
+    values:
+      - exporter:
+          enabled: true
+          name: "locust-exporter"
+      # ConfigMaps names defined for Locust tests.
+      # These must match the ones expected by the main Locust chart.
+      - locustfileConfigMapName: custom-locust-scripts
+      - libConfigMapName: custom-locust-libs
+      # - locustfile: "locustfile_blazer_test.py" # "{{ env "LOCUSTFILE" | default "locustfile_default.py" }}"
+      - locustfile: "{{ .Environment.Name }}.py"
+
+  - name: locust
+    namespace: testing
+    chart: deliveryhero/locust
+    values:
+      - "./config/{{ .Environment.Name }}/locust.yml"
+      - loadtest:
+          locust_host: '{{ env "HOST" }}'
+    needs: # Ensure the config maps are created before Locust starts
+      - testing/locust-config
+      # - keda/keda-operator # This is needed for autoscaling
+      # Since the DevOps cluster uses KEDA, it is not necessary to include the KEDA operator in this Helmfile.
